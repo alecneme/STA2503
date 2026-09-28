@@ -1,0 +1,24 @@
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# --- LaTeX build files (keep the .tex, ignore what the compiler generates) ---
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.nav
+*.snm
+
+# --- OS clutter ---
+Thumbs.db
+desktop.ini
+.DS_Store

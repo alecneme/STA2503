@@ -1,0 +1,157 @@
+\documentclass[12pt]{amsart}
+\usepackage{amsthm,amssymb,amsmath}
+\usepackage{graphicx}
+\usepackage{subfigure}
+\usepackage{natbib}
+\usepackage{dsfont}
+\usepackage{multirow}
+
+
+%\usepackage[justification=centering]{caption}
+
+\textwidth 175mm
+\oddsidemargin -5mm
+\evensidemargin -5mm
+\textheight 230mm
+\topmargin -10mm
+
+
+\title[]{STA2503:  Mathematical Finance Report Template}
+
+
+\author{A. Author}
+%\address{MMF Candidate}
+%\email{studentA@mmf.utoronto.ca}
+
+\author{B. Author}
+%\address{MMF Candidate}
+%\email{studentB@mmf.utoronto.ca}
+
+\author{C. Author}
+%\address{MMF Candidate}
+%\email{studentC@mmf.utoronto.ca}
+
+\begin{document}
+
+
+\begin{abstract}
+Here is where you would put your executive summary of the project -- no more than 2 short paragraphs.
+\end{abstract}
+
+
+\maketitle
+
+\section{Introduction}
+
+Here is where you would put an introduction about what you are doing and what are your main findings.
+
+\section{Methodolgy}
+
+Here is where you would describe more details about the model and methodology
+
+Here are some sample equations...
+\begin{equation}
+\varphi_\tau^\nu = \underbrace{\mathfrak n \;(A_\tau-S_0)}_\text{TWAP spread} -
+\left(\underbrace{ \int_{0}^\tau\nu_u \,\hat{S}_u^\nu \,du}_\text{cost of cotinuous trading} +  \underbrace{q_{\tau^-} \left(S_\tau^\nu+\alpha(S_\tau^\nu)\, q_{\tau^-} \right) }_\text{cost of block trade}\right)\,. \label{eqn:payoff}
+\end{equation}
+
+\begin{subequations}
+\begin{align}
+C=&\left\{\,(t,S,A,q)\, : \, H(t,S,A,q)>\mathfrak n (A-S_0)- \ell(q,S) \,\right\} & \text{continuation region},
+\label{eqn:C} \\
+D=&\left\{\,(t,S,A,q)\, : \, H(t,S,A,q) \leq \mathfrak n (A-S_0)- \ell(q,S)\,\right\} & \text{stopping region},
+\label{eqn:D} \\
+E=&\left\{\,(t,S,A,q)\, : \, H(t,S,A,q) = \mathfrak n (A-S_0)- \ell(q,S)\,\right\} & \text{exercise boundary.}
+\label{eqn:E}
+\end{align}
+\label{eqn:CDE}
+\end{subequations}
+
+You can reference the equations individually: C is in \eqref{eqn:C}, D is in \eqref{eqn:D}, E is in \eqref{eqn:E} and all together they are CDE are all in \eqref{eqn:CDE}.
+
+You can include .pdf or .png figures as in Figures \ref{fig:CRRTree} and \ref{fig:SamplePath} below. Notice that I have used large enough fonts on axis titles and numbering so that everything is easy to read.
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[width=0.4\textwidth]{figures/CRRTree.pdf}
+\end{center}
+\caption{A binomial tree. \label{fig:CRRTree}}
+\end{figure}
+
+
+\begin{figure}[h!]
+\begin{center}
+\includegraphics[width=0.5\textwidth]{figures/DMCashFlowFuncs_3D.pdf}
+\end{center}
+\caption{This diagram shows a sample path of the sector indicator and its transformation to cash-flows. \label{fig:SamplePath}}
+\end{figure}
+
+
+You can generate .pdf from matlab figures by using the {\tt save2pdf.m} function. When a figure is selected, calling {\tt save2pdf('AFigure')} will save a .pdf with name {\tt AFigure} in the current working directory exactly as it appears on the screen.
+
+\section{Results}
+
+Here is where you would put results and any financial intuition.
+
+\subsection{A subsection}
+
+Below, Table \ref{tbl:SimpleTable} shows a simple example table. 
+\begin{table}[h!]
+\begin{tabular}{l*{6}{c}r}
+ Team              & P & W & D & L & F  & A & Pts \\
+\hline
+ Manchester United & 6 & 4 & 0 & 2 & 10 & 5 & 12  \\
+ Celtic            & 6 & 3 & 0 & 3 &  8 & 9 &  9  \\
+ Benfica           & 6 & 2 & 1 & 3 &  7 & 8 &  7  \\
+ FC Copenhagen     & 6 & 2 & 1 & 3 &  5 & 8 &  7  \\
+\end{tabular}
+\caption{A very simple table. \label{tbl:SimpleTable} }
+\end{table}
+
+\subsection{Another Subsection}
+
+Table \ref{tbl:SummaryStatistics} shows a more complex table.
+\begin{table}[h!]
+\begin{tabular}{ccclll}
+ \hline\hline
+\multicolumn{6}{c}{Case I: $\varepsilon=0.04$, $\rho=0.7$ and liquidation costs = 1bp} \\
+ \hline\hline
+
+$\phi $ & $\alpha_t$ & & Bench.  & $\rho=1$ & $\rho=0$  \\
+ \hline  %\hline
+ \multicolumn{1}{c}{\multirow{4}[0]{*}{$1\times10^{-5}$}} & \multicolumn{1}{c}{\multirow{2}[0]{*}{Yes}}
+  & mean & 14.16 & 12.97 &  9.96 \\[0.5em]
+ &  & (std.) &(6.84) & (7.31) & (5.88) \\[0.5em]
+& \multicolumn{1}{c}{\multirow{2}[0]{*}{No}}
+ & mean & -3.82 & -3.86 & -4.35 \\[0.5em]
+&  & (std.) &(2.85) & (2.85) & (2.99) \\[0.5em]
+
+\hline
+
+\multicolumn{1}{c}{\multirow{4}[0]{*}{$2\times10^{-5}$}} & \multicolumn{1}{c}{\multirow{2}[0]{*}{Yes}}
+ & mean & 13.42 & 12.36 &  9.68  \\[0.5em]
+&  & (std.) &(5.35) & (5.64) & (4.75) \\[0.5em]
+& \multicolumn{1}{c}{\multirow{2}[0]{*}{No}}
+& mean & -1.68 & -1.79 & -2.82 \\[0.5em]
+&  & (std.) &(2.09) & (2.08) & (2.19) \\[0.5em]
+
+\hline
+
+\multicolumn{1}{c}{\multirow{4}[0]{*}{$4\times10^{-5}$}} & \multicolumn{1}{c}{\multirow{2}[0]{*}{Yes}}
+ & mean & 12.27 & 11.34 &  9.19 \\[0.5em]
+&  & (std.) &(4.23) & (4.41) & (3.86) \\[0.5em]
+& \multicolumn{1}{c}{\multirow{2}[0]{*}{No}}
+  & mean &  0.07 & -0.06 & -1.27 \\[0.5em]
+&  & (std.) &(1.50) & (1.49) & (1.60) \\[0.5em]
+ \hline\hline
+\end{tabular}
+\caption{The results from some simulation. \label{tbl:SummaryStatistics} }
+\end{table}
+
+\section{Conclusions}
+
+Write some concluding remarks here.
+
+\clearpage
+
+
+\end{document}
