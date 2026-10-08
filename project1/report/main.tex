@@ -16,6 +16,12 @@
 \textheight 230mm
 \topmargin -10mm
 
+% ---- subsection headings on their own line (amsart default is run-in) ----
+\makeatletter
+\def\subsection{\@startsection{subsection}{2}{\z@}{.7\linespacing\@plus\linespacing}%
+  {.5\linespacing}{\normalfont\bfseries}}
+\makeatother
+
 % ---- helpers ----
 % \TODO{...} prints a bold reminder in the PDF. Search for "TODO" before submitting: none should be left.
 \newcommand{\TODO}[1]{\textbf{[TODO: #1]}}
@@ -88,13 +94,24 @@ No arbitrage requires $d<e^{r\Delta t}<u$, which holds for our parameters.
 \TODO{1 sentence: note that $e^{r\Delta t}$ is the continuously-compounded version of the $1+r$
 used in lecture.}
 After $n$ steps with $j$ up-moves the price is $S_n(j)=S_0\,u^{j}d^{\,n-j}$, $j=0,\dots,n$.
+Since $d=1/u$ the tree recombines, so only the number of up-moves matters, not their order
+(e.g.\ $S_2(HT)=S_2(TH)=S_2(1)$ in the path notation of the lectures).
 A European call is priced by backward induction:
 \begin{equation}\label{eq:backward}
 V_N(j)=\bigl(S_N(j)-K\bigr)^+,\qquad
 V_n(j)=e^{-r\Delta t}\Bigl[\tilde p\,V_{n+1}(j+1)+(1-\tilde p)\,V_{n+1}(j)\Bigr],
 \end{equation}
 and the price is $V_0(0)$.
-\TODO{Figure of the tree (small $N$, e.g.\ 3 or 4) with prices at the nodes -- produced in Notebook 02.}
+Figure~\ref{fig:tree} shows the tree for NVDA with $N=4$.
+\TODO{1--2 sentences on what the figure shows: the tree recombines (e.g.\ \$228.38 reappears at
+$t=0.5$ and $t=1$); up-moves are larger in dollars than down-moves because $u=1/d$ acts
+multiplicatively; for even $N$ one terminal node sits exactly at $K=S_0$.}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.7\textwidth]{figures/part2_crr_tree.pdf}
+\caption{CRR binomial tree for NVDA with $N=4$ steps over one year. \label{fig:tree}}
+\end{figure}
 
 \subsection{Geometric Brownian motion}
 Under GBM, $dS_t=\mu S_t\,dt+\sigma S_t\,dW_t$. Applying It\^o's formula to $\log S_t$,
@@ -106,6 +123,8 @@ S_t=S_0\exp\Bigl[\Bigl(\mu-\tfrac12\sigma^2\Bigr)t+\sigma W_t\Bigr].
 \TODO{Optional: show the It\^o step in one more line ($f(x)=\log x$, $f'=1/x$, $f''=-1/x^2$, $d[S]_t=\sigma^2S_t^2dt$).}
 
 For pricing we work under the risk-neutral measure $\Q$, where $\mu$ is replaced by $r$.
+We also use $\mu=r$ for the simulated sample paths, so that both models are simulated under the
+same measure (the binomial paths use $\tilde p$); estimating NVDA's real-world drift is not required.
 The Euler--Maruyama scheme on the grid $t_k=k\Delta t$ is
 \begin{equation}\label{eq:euler}
 S_{t_{k+1}} = S_{t_k}\bigl(1+r\Delta t+\sigma\sqrt{\Delta t}\,\xi_{k+1}\bigr),\qquad \xi_k\overset{iid}{\sim}\N(0,1).
@@ -119,9 +138,10 @@ where $s$ is the sample standard deviation of the discounted payoffs; a 95\% con
 
 \subsection{Black--Scholes benchmark}
 \begin{equation}\label{eq:bs}
-C_{BS}=S_0\,\Phi(d_1)-Ke^{-rT}\Phi(d_2),\qquad
-d_1=\frac{\ln(S_0/K)+(r+\tfrac12\sigma^2)T}{\sigma\sqrt T},\qquad d_2=d_1-\sigma\sqrt T.
+C_{BS}=S_0\,\Phi(d_+)-Ke^{-rT}\Phi(d_-),\qquad
+d_\pm=\frac{\ln(S_0/K)+(r\pm\tfrac12\sigma^2)T}{\sigma\sqrt T},
 \end{equation}
+where $\Phi$ is the standard normal CDF.
 
 \subsection{Assumptions}
 \begin{table}[H]
@@ -130,13 +150,14 @@ d_1=\frac{\ln(S_0/K)+(r+\tfrac12\sigma^2)T}{\sigma\sqrt T},\qquad d_2=d_1-\sigma
 \toprule
 Parameter & Value & Source / justification \\
 \midrule
-$S_0$ & \TODO{\$xxx.xx} & NVDA close on \TODO{date}, from \TODO{website} \\
+$S_0$ & \$228.38 & NVDA close, 30 Sep 2026 (Yahoo Finance) \\
 $K$ & $S_0$ & at-the-money, as required \\
 $T$ & 1 year & as required \\
 $r$ & 4\% (cont.\ comp.) & suggested in the project \\
 $\sigma$ & 30\% annualised & suggested in the project \\
-$N$ (tree steps) & \TODO{e.g.\ 50, 100, \dots} & convergence study \\
-$M$ (MC paths) & \TODO{e.g.\ 100{,}000} & \\
+$N$ (tree steps) & 100 & suggested in the project; 1--300 in Fig.~\ref{fig:convergence} \\
+$N$ (Euler steps) & 100 & same time grid as the tree \\
+$M$ (MC paths) & 100{,}000 & standard error $\approx\$0.16$ \\
 \bottomrule
 \end{tabular}
 \caption{Model inputs. \label{tbl:assumptions}}
@@ -188,10 +209,42 @@ straight segment has slope $\pm\sqrt{N_2}$, which becomes steeper as $N_2$ grows
 discrete counterpart of the fact that Brownian motion paths are not differentiable.
 
 \subsection{Binomial model}
-\TODO{Notebook 02: tree figure (small $N$); table/plot of the call price against $N$ with the Black--Scholes value as a horizontal line; 1-year call price for the chosen $N$.}
 
-\subsection{GBM and Monte Carlo}
-\TODO{Notebook 03: figure of simulated GBM paths; Monte Carlo price with SE and 95\% CI; (optional) exact vs.\ Euler--Maruyama.}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/part2_binomial_convergence.pdf}
+\caption{CRR price of the one-year at-the-money call against the number of steps $N$, with the
+Black--Scholes price (dashed). \label{fig:convergence}}
+\end{figure}
+
+\TODO{Discussion (a short paragraph or two), referring to Figure~\ref{fig:convergence}:
+(i) the 1-year call price with $N=100$ is \$31.3425 (task 2c);
+(ii) as $N$ grows the price converges to Black--Scholes (\$31.4097); quote e.g.\ $N=10$: \$30.75, $N=1000$: \$31.40;
+(iii) the error shrinks roughly like $1/N$ ($N\times$error $\approx -6.7$ for all $N$ tried);
+(iv) the price zig-zags: even $N$ lies below Black--Scholes and odd $N$ above, because for even $N$ a terminal node sits exactly at $K=S_0$ (Figure~\ref{fig:tree});
+(v) optional: $\tilde p\to\tfrac12$ as $N$ grows ($0.4959$ at $N=4$, $0.4992$ at $N=100$).}
+
+\subsection{Sample paths and Monte Carlo}
+
+\begin{figure}[H]
+\centering
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{figures/part2_tree_paths.pdf}
+  \caption{CRR binomial tree, $N=100$.}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{figures/part2_gbm_paths.pdf}
+  \caption{GBM, Euler--Maruyama with $N=100$.}
+\end{subfigure}
+\caption{Ten simulated NVDA price paths over one year under each model (risk-neutral measure). \label{fig:paths}}
+\end{figure}
+
+\TODO{Discussion: compare the two panels of Figure~\ref{fig:paths}. With $N=100$ the tree paths
+already look much like GBM paths (each tree step is $\pm\sigma\sqrt{\Delta t}\approx\pm3\%$, the
+same scale as the GBM shock), but tree prices can only land on the $N+1$ nodes, while GBM prices
+can take any positive value. Both fan out over time (roughly \$150--\$350 by $t=1$).
+Then report the Monte Carlo price with its SE and 95\% CI (from the final Restart \& Run All),
+and whether the Black--Scholes price lies inside the interval.}
 
 \subsection{Comparison}
 \begin{table}[H]
@@ -200,14 +253,19 @@ discrete counterpart of the fact that Brownian motion paths are not differentiab
 \toprule
 Method & Call price (\$) & Difference from BS (\$) \\
 \midrule
-CRR binomial, $N=$ \TODO{} & \TODO{} & \TODO{} \\
-Monte Carlo (GBM), $M=$ \TODO{} & \TODO{} $\pm$ \TODO{} & \TODO{} \\
-Black--Scholes & \TODO{} & -- \\
+CRR binomial, $N=100$ & 31.3425 & $-0.0672$ \\
+Monte Carlo (GBM), $M=100{,}000$ & \TODO{x.xxxx} $\pm$ \TODO{0.16} & \TODO{} \\
+Black--Scholes & 31.4097 & -- \\
 \bottomrule
 \end{tabular}
 \caption{One-year at-the-money European call on NVDA. \label{tbl:comparison}}
 \end{table}
-\TODO{Discussion: is the binomial error shrinking like $1/N$ (with odd/even oscillation)? Is BS inside the MC confidence interval? Trade-offs: speed, accuracy, what each model is good for.}
+% Monte Carlo row: copy the numbers from the comparison cell after the final Restart & Run All.
+\TODO{Discussion: (i) all three prices agree to within a few cents; (ii) the binomial error is
+deterministic and shrinks like $1/N$, while the Monte Carlo error is random and shrinks like
+$1/\sqrt M$ (it comes with a confidence interval); (iii) trade-offs: for a European call the tree
+reaches Black--Scholes accuracy much faster, while Monte Carlo is more flexible (path-dependent
+payoffs, several assets).}
 
 % =====================================================================
 \section{Conclusions}
