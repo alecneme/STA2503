@@ -15,6 +15,8 @@
 \evensidemargin -5mm
 \textheight 230mm
 \topmargin -10mm
+\raggedbottom   % let pages end at different heights instead of stretching vertical space
+\setlength{\parskip}{0.6em plus 0.2em}   % space between paragraphs
 
 % ---- subsection headings on their own line (amsart default is run-in) ----
 \makeatletter
@@ -34,7 +36,6 @@
 
 \title[Discrete- vs.\ Continuous-Time Models]{STA2503 Project 1: Discrete-Time vs.\ Continuous-Time Financial Models}
 \author{Alec Neme}
-% \email{...}   % TODO: add your UofT email if the course wants it
 
 \begin{document}
 
@@ -43,7 +44,7 @@
 and Brownian motion; priced a 1-year at-the-money European call on NVIDIA with a CRR binomial tree
 and with Monte Carlo under GBM; compared both with Black--Scholes. (2) Main findings, with the
 actual numbers: e.g.\ ``the binomial price converges to the Black--Scholes value of \$X as $N$
-grows; the Monte Carlo estimate is \$Y $\pm$ Z''.}
+grows; the Monte Carlo estimate is \$Y $\pm$ Z''.} lalala just testing
 \end{abstract}
 
 \maketitle
@@ -59,6 +60,10 @@ vs.\ GBM for NVDA) and the headline result in one sentence.}
 % =====================================================================
 \section{Methodology}
 % =====================================================================
+All computations are done in Python (3.14) with NumPy for arrays and random numbers, SciPy for
+the normal CDF, pandas and \texttt{yfinance} for the market data, and Matplotlib for the figures.
+The code is organised as small functions, one per step of the methodology below
+(Appendix~\ref{app:code}).
 
 \subsection{Brownian motion and scaled random walks}
 Let $(\Omega,\mathcal F,\{\mathcal F_t\}_{t\ge 0},\PP)$ be a filtered probability space.
@@ -81,18 +86,67 @@ which is exact at the grid points by property 2. We take $N_1=10{,}000$.
 W^{(N)}_t = \frac{1}{\sqrt N}\sum_{i=1}^{Nt} Z_i,\qquad t\in\{0,\tfrac1N,\dots,1\}.
 \end{equation}
 Each increment of $W^{(N)}$ has mean $0$ and variance $1/N=\Delta t$, matching those of BM.
-We simulate $N_2\in\{10,50,200,1000\}$.
-\TODO{Optional 1--2 sentences: why the $1/\sqrt N$ scaling (it is the only scaling that keeps
-$\operatorname{Var}(W^{(N)}_1)=1$ as $N\to\infty$).}
+We simulate $N_2\in\{10,50,200,1000\}$. The $1/\sqrt N$ scaling is used because it is the only scaling that keeps
+$\operatorname{Var}(W^{(N)}_1)=1$ as $N\to\infty$.
 
-\subsection{The CRR binomial model}
+\noindent\textbf{Implementation.} \texttt{simulate\_bm} draws all increments $\sqrt{\Delta t}\,\xi$
+at once as an array with one row per path and one column per time step, and builds the paths
+with a cumulative sum along each row, as in \eqref{eq:bm_scheme}. \texttt{scaled\_random\_walk}
+does the same with $\pm1$ steps drawn by \texttt{rng.choice} and then rescales by $1/\sqrt N$,
+as in \eqref{eq:srw}. A column of zeros is prepended so that every path starts at $0$.
+
+\subsection{Market data and parameters}
+The inputs below are shared by the three pricing methods of Sections~\ref{sec:crr}--\ref{sec:bs}.
+
+\noindent\textbf{Stock price, strike and maturity.} $S_0=\$228.38$ is the NVDA closing price on
+30 September 2026 (Yahoo Finance). As required by the project, the option is at-the-money,
+$K=S_0$, with maturity $T=1$ year.
+
+\noindent\textbf{Volatility.} Under GBM, daily log returns
+$R_i=\ln(S_{t_i}/S_{t_{i-1}})$ are i.i.d.\ $\N\bigl((\mu-\tfrac12\sigma^2)\Delta t,\ \sigma^2\Delta t\bigr)$
+with $\Delta t=1/252$ (trading days per year). We therefore estimate $\sigma$ by the
+annualised sample standard deviation of daily log returns (historical volatility),
+\begin{equation}\label{eq:sigma_hat}
+\hat\sigma=\sqrt{252}\;\operatorname{sd}(R_1,\dots,R_n),
+\end{equation}
+using the $n=251$ daily returns from the 252 adjusted closing prices between 30 September 2025
+and 30 September 2026. The one-year window matches the maturity of the option, and adjusted
+prices remove artificial jumps due to stock splits and dividends. This gives
+$\hat\sigma=37.60\%$, with approximate standard error
+$\hat\sigma/\sqrt{2n}\approx1.7$ percentage points. In the code, \texttt{estimate\_volatility}
+computes the log returns with \texttt{np.diff(np.log(closes))} and applies \eqref{eq:sigma_hat}.
+
+\noindent\textbf{Interest rate.} We use $r=4\%$, a round value within the range of the 1-year
+US Treasury yield over the past year (approximately 3.4\%--4.6\%) and somewhat below its level
+on the pricing date (4.54\% on 30 September 2026; U.S.\ Department of the Treasury, daily par
+yield curve). The rate is assumed constant and continuously compounded.
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lll}
+\toprule
+Parameter & Value & Source / justification \\
+\midrule
+$S_0$ & \$228.38 & NVDA close, 30 Sep 2026 (Yahoo Finance) \\
+$K$ & $S_0$ & at-the-money, as required \\
+$T$ & 1 year & as required \\
+$\sigma$ & 37.60\% & historical volatility, eq.~\eqref{eq:sigma_hat} \\
+$r$ & 4\% (cont.\ comp.) & close to 1-year US Treasury yield \\
+$N$ (tree and Euler steps) & 100 & Sections~\ref{sec:crr} and~\ref{sec:gbm} \\
+$M$ (MC paths) & 100{,}000 & Section~\ref{sec:gbm} \\
+\bottomrule
+\end{tabular}
+\caption{Model inputs. \label{tbl:assumptions}}
+\end{table}
+
+\subsection{The CRR binomial model}\label{sec:crr}
 With $N$ steps over $[0,T]$ and $\Delta t = T/N$, the stock moves from $S$ to $uS$ or $dS$, where
 \begin{equation}\label{eq:crr}
 u=e^{\sigma\sqrt{\Delta t}},\qquad d=\frac1u,\qquad \tilde p=\frac{e^{r\Delta t}-d}{u-d}.
 \end{equation}
 No arbitrage requires $d<e^{r\Delta t}<u$, which holds for our parameters.
-\TODO{1 sentence: note that $e^{r\Delta t}$ is the continuously-compounded version of the $1+r$
-used in lecture.}
+Note that $e^{r\Delta t}$ is the continuously-compounded version of the $1+r$
+rate used in lecture. Similarly, for the model we assume a finite and constant r.
 After $n$ steps with $j$ up-moves the price is $S_n(j)=S_0\,u^{j}d^{\,n-j}$, $j=0,\dots,n$.
 Since $d=1/u$ the tree recombines, so only the number of up-moves matters, not their order
 (e.g.\ $S_2(HT)=S_2(TH)=S_2(1)$ in the path notation of the lectures).
@@ -102,25 +156,30 @@ V_N(j)=\bigl(S_N(j)-K\bigr)^+,\qquad
 V_n(j)=e^{-r\Delta t}\Bigl[\tilde p\,V_{n+1}(j+1)+(1-\tilde p)\,V_{n+1}(j)\Bigr],
 \end{equation}
 and the price is $V_0(0)$.
-Figure~\ref{fig:tree} shows the tree for NVDA with $N=4$.
-\TODO{1--2 sentences on what the figure shows: the tree recombines (e.g.\ \$228.38 reappears at
-$t=0.5$ and $t=1$); up-moves are larger in dollars than down-moves because $u=1/d$ acts
-multiplicatively; for even $N$ one terminal node sits exactly at $K=S_0$.}
+An example tree for NVDA is shown in Figure~\ref{fig:tree} (Section~\ref{sec:binomial}).
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.7\textwidth]{figures/part2_crr_tree.pdf}
-\caption{CRR binomial tree for NVDA with $N=4$ steps over one year. \label{fig:tree}}
-\end{figure}
+\noindent\textbf{Number of steps.} We use $N=100$: at this size the price is within about 0.2\%
+of the Black--Scholes value and, since the error decreases roughly like $1/N$
+(Section~\ref{sec:binomial}), further steps add little. To study convergence we also price the
+option for every $N$ from 1 to 300.
 
-\subsection{Geometric Brownian motion}
+\noindent\textbf{Implementation.} \texttt{crr\_parameters} computes $u$, $d$, $\tilde p$ from
+\eqref{eq:crr} and raises an error if the no-arbitrage condition $d<e^{r\Delta t}<u$ fails.
+\texttt{prices\_at\_step} returns all $n+1$ prices $S_n(j)$ at once by treating $j$ as an array.
+\texttt{backward\_induction} implements \eqref{eq:backward} with array slicing: for the vector
+of values $V_{n+1}$, the up-children of all nodes are \texttt{V[1:]} and the down-children are
+\texttt{V[:-1]}, so each step back is a single vectorised line. \texttt{binomial\_call} chains
+these functions. Sample paths through the tree (\texttt{simulate\_tree\_paths}) draw up-moves
+with probability $\tilde p$ by comparing uniform random numbers with $\tilde p$, map them to
+factors $u$ or $d$ with \texttt{np.where}, and take a cumulative product along each path.
+
+\subsection{Geometric Brownian motion and Monte Carlo}\label{sec:gbm}
 Under GBM, $dS_t=\mu S_t\,dt+\sigma S_t\,dW_t$. Applying It\^o's formula to $\log S_t$,
 \[
 d\log S_t=\Bigl(\mu-\tfrac12\sigma^2\Bigr)dt+\sigma\,dW_t
 \quad\Longrightarrow\quad
 S_t=S_0\exp\Bigl[\Bigl(\mu-\tfrac12\sigma^2\Bigr)t+\sigma W_t\Bigr].
 \]
-\TODO{Optional: show the It\^o step in one more line ($f(x)=\log x$, $f'=1/x$, $f''=-1/x^2$, $d[S]_t=\sigma^2S_t^2dt$).}
 
 For pricing we work under the risk-neutral measure $\Q$, where $\mu$ is replaced by $r$.
 We also use $\mu=r$ for the simulated sample paths, so that both models are simulated under the
@@ -136,33 +195,41 @@ With $M$ simulated paths, the Monte Carlo price and its standard error are
 \end{equation}
 where $s$ is the sample standard deviation of the discounted payoffs; a 95\% confidence interval is $\widehat C\pm1.96\,\mathrm{SE}$.
 
-\subsection{Black--Scholes benchmark}
+\noindent\textbf{Numerical parameters.} The Euler--Maruyama scheme uses the same time grid as
+the tree ($N=100$, $\Delta t=0.01$), so both models are compared on the same discretisation.
+We use $M=100{,}000$ paths, which gives a standard error of about 0.5\% of the option price;
+since the error decreases only like $1/\sqrt M$, halving it would require four times as many paths.
+
+\noindent\textbf{Implementation.} \texttt{simulate\_gbm\_euler} implements \eqref{eq:euler}
+with the same structure as the tree simulation: it draws all standard normals $\xi$ at once,
+forms the one-step factors $1+r\Delta t+\sigma\sqrt{\Delta t}\,\xi$, and takes a cumulative
+product along each path. \texttt{mc\_call\_price} computes the estimator and standard error
+\eqref{eq:mc} from the terminal prices, using the sample standard deviation (with $M-1$ in the
+denominator).
+
+\subsection{Black--Scholes benchmark}\label{sec:bs}
 \begin{equation}\label{eq:bs}
 C_{BS}=S_0\,\Phi(d_+)-Ke^{-rT}\Phi(d_-),\qquad
 d_\pm=\frac{\ln(S_0/K)+(r\pm\tfrac12\sigma^2)T}{\sigma\sqrt T},
 \end{equation}
-where $\Phi$ is the standard normal CDF.
+where $\Phi$ is the standard normal CDF, evaluated with \texttt{scipy.stats.norm.cdf} in
+\texttt{black\_scholes\_call}.
 
-\subsection{Assumptions}
-\begin{table}[H]
-\centering
-\begin{tabular}{lll}
-\toprule
-Parameter & Value & Source / justification \\
-\midrule
-$S_0$ & \$228.38 & NVDA close, 30 Sep 2026 (Yahoo Finance) \\
-$K$ & $S_0$ & at-the-money, as required \\
-$T$ & 1 year & as required \\
-$r$ & 4\% (cont.\ comp.) & suggested in the project \\
-$\sigma$ & 30\% annualised & suggested in the project \\
-$N$ (tree steps) & 100 & suggested in the project; 1--300 in Fig.~\ref{fig:convergence} \\
-$N$ (Euler steps) & 100 & same time grid as the tree \\
-$M$ (MC paths) & 100{,}000 & standard error $\approx\$0.16$ \\
-\bottomrule
-\end{tabular}
-\caption{Model inputs. \label{tbl:assumptions}}
-\end{table}
-\TODO{1 sentence: tasks 2(c) and 3 of the project mention Amazon; we treat this as a typo and use NVDA throughout.}
+\subsection{Verification and reproducibility}
+\noindent\textbf{Verification.} Each function was tested against a known answer before use:
+the backward induction reproduces the 3-period example from the lectures ($V_0=2.048$); the
+no-arbitrage check correctly rejects inconsistent inputs; for both the tree and the Euler
+scheme, the simulated mean of $S_T$ under $\Q$ matches $S_0e^{rT}$ within Monte Carlo error,
+as required by the martingale property of discounted prices; and the Monte Carlo confidence
+interval was checked for coverage over repeated runs (Section~\ref{sec:comparison}).
+
+\noindent\textbf{Reproducibility.} All randomness comes from NumPy random generators with fixed
+seeds (\texttt{default\_rng(2503)} in each notebook, and separate fixed seeds for the tests), so
+re-running a notebook from top to bottom reproduces every figure and number in this report.
+Market data are downloaded once and stored as CSV files, so results do not change when new
+data become available. Every figure is produced by the code and saved directly into the report,
+and all reported numbers come from a single top-to-bottom run of each notebook. The code is
+version-controlled with Git.
 
 % =====================================================================
 \section{Results}
@@ -183,46 +250,73 @@ $M$ (MC paths) & 100{,}000 & standard error $\approx\$0.16$ \\
 \caption{Five sample paths of each process on $[0,1]$. \label{fig:bm_rw10}}
 \end{figure}
 
+Figure~\ref{fig:bm_rw10} compares Brownian motion simulated with $N_1 = 10{,}000$ steps to a
+scaled random walk with only $N_2 = 10$ steps. The random walk is piecewise linear: each path
+changes direction only at the grid points $t = 0.1, 0.2, \dots, 1$ and moves in straight lines
+in between, with every step of size $\pm 1/\sqrt{10} \approx \pm 0.32$. The Brownian motion
+paths, on the other hand, oscillate at every time scale and show no visible straight segments.
+Even so, the two processes already share some features: both start at $0$, have mean zero, and
+spread out by a similar amount by $t = 1$, since the scaling gives
+$\operatorname{Var}(W^{(N_2)}_1) = 1$, the same as $\operatorname{Var}(W_1)$.
+
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.9\textwidth]{figures/part1_rw_vs_bm.pdf}
+\includegraphics[width=0.85\textwidth]{figures/part1_rw_vs_bm.pdf}
 \caption{Scaled random walks (colour) for increasing $N_2$, with the Brownian motion paths of
 Figure~\ref{fig:bm_rw10}(a) in grey. \label{fig:rw_vs_bm}}
 \end{figure}
 
-\noindent\textbf{Discussion.}
+Figure~\ref{fig:rw_vs_bm} shows what happens as $N_2$ increases. When $N_2 = 200$, the scaled
+random walk starts looking more like Brownian motion, and for $N_2 = 1000$ the two are
+indistinguishable in character, even though the coloured and grey paths are independent
+realizations. This happens because Brownian motion is the limit in distribution of the scaled
+random walk (Donsker's theorem). As we increase $N_2$, the walk changes value more frequently
+(every $1/N_2$ units of time), and at the same time each step shrinks to $\pm 1/\sqrt{N_2}$.
+The scaling is done because without it, $\operatorname{Var}(W_1)$ would equal $N_2$ and the
+walk would blow up, whereas with it $\operatorname{Var}(W^{(N_2)}_1) = 1$ for every $N_2$.
+Each straight segment has slope $\pm\sqrt{N_2}$, which becomes steeper as $N_2$ grows; this is
+the discrete counterpart of the fact that Brownian motion paths are nowhere differentiable.
 
-As we can see from Figure~\ref{fig:rw_vs_bm}, for small $N_2$ the simulated random walks are
-piecewise linear: with $N_2 = 10$, each path changes direction only at the grid points
-$t = 0.1, 0.2, \dots, 1$ and moves in straight lines in between. The Brownian motion paths
-generated with $N_1 = 10{,}000$ steps (in grey), on the other hand, oscillate at every time
-scale and show no visible straight segments. When $N_2 = 200$, the scaled random walk starts
-looking more like Brownian motion, and for $N_2 = 1000$ the two are indistinguishable in
-character, even though the coloured and grey paths are independent realizations.
-
-This happens because Brownian motion is the limit in distribution of the scaled random walk
-(Donsker's theorem). As we increase $N_2$, the walk changes value more frequently (every
-$1/N_2$ units of time), and at the same time each step shrinks to $\pm 1/\sqrt{N_2}$. The
-scaling is done because without it, $\operatorname{Var}(W_1)$ would equal $N_2$ and the walk
-would blow up, whereas with it $\operatorname{Var}(W^{(N_2)}_1) = 1$ for every $N_2$. Each
-straight segment has slope $\pm\sqrt{N_2}$, which becomes steeper as $N_2$ grows; this is the
-discrete counterpart of the fact that Brownian motion paths are not differentiable.
-
-\subsection{Binomial model}
+\subsection{Binomial model}\label{sec:binomial}
+\TODO{Update ALL numbers in Sections 3.2--3.4 after Restart \& Run All with $\hat\sigma=37.60\%$
+(e.g.\ BS $\approx 38.05$; CRR $N=100\approx37.97$; $N=4$: $u=1.2068$, $d=0.8286$, $\tilde p=0.4797$;
+first-step prices, error values, $N\times$error, odd-$N$ example, $\tilde p$ at $N=100\approx0.4959$).}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.8\textwidth]{figures/part2_binomial_convergence.pdf}
-\caption{CRR price of the one-year at-the-money call against the number of steps $N$, with the
-Black--Scholes price (dashed). \label{fig:convergence}}
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{figures/part2_crr_tree.pdf}
+  \caption{CRR tree for NVDA with $N=4$ steps. \label{fig:tree}}
+\end{subfigure}\hfill
+\begin{subfigure}{0.49\textwidth}
+  \includegraphics[width=\linewidth]{figures/part2_binomial_convergence.pdf}
+  \caption{CRR call price against $N$, with the Black--Scholes price (dashed). \label{fig:convergence}}
+\end{subfigure}
+\caption{CRR binomial model for the one-year at-the-money call on NVDA. \label{fig:binomial}}
 \end{figure}
 
-\TODO{Discussion (a short paragraph or two), referring to Figure~\ref{fig:convergence}:
-(i) the 1-year call price with $N=100$ is \$31.3425 (task 2c);
-(ii) as $N$ grows the price converges to Black--Scholes (\$31.4097); quote e.g.\ $N=10$: \$30.75, $N=1000$: \$31.40;
-(iii) the error shrinks roughly like $1/N$ ($N\times$error $\approx -6.7$ for all $N$ tried);
-(iv) the price zig-zags: even $N$ lies below Black--Scholes and odd $N$ above, because for even $N$ a terminal node sits exactly at $K=S_0$ (Figure~\ref{fig:tree});
-(v) optional: $\tilde p\to\tfrac12$ as $N$ grows ($0.4959$ at $N=4$, $0.4992$ at $N=100$).}
+Figure~\ref{fig:tree} shows the CRR tree for NVDA with $N=4$, for which $u=1.1618$,
+$d=0.8607$ and $\tilde p=0.4959$. Because $d=1/u$, an up-move followed by a down-move returns
+the stock to its starting value, so the tree recombines: \$228.38 reappears at $t=0.5$ and
+$t=1$, and after $n$ steps there are only $n+1$ distinct prices rather than $2^n$. The moves
+are proportional rather than additive, so in dollar terms an up-move is larger than a down-move
+(\$228.38 rises to \$265.34 or falls to \$196.57 in the first step). Finally, since $N$ is even,
+one terminal node lies exactly at the strike $K=S_0=\$228.38$.
+
+
+
+With $N=100$ steps, the CRR price of the one-year at-the-money call is \$31.3425.
+Figure~\ref{fig:convergence} shows that as $N$ increases the binomial price converges to the
+Black--Scholes price of \$31.4097: the error is $-\$0.66$ for $N=10$, $-\$0.07$ for $N=100$
+and $-\$0.007$ for $N=1000$. The product $N\times(\text{error})$ stays close to $-6.7$ for all
+$N$ we tried, so the error decreases roughly like $1/N$. The convergence is not monotone: the
+price oscillates between even $N$, which lie below Black--Scholes, and odd $N$, which lie above
+it (e.g.\ \$31.4731 for $N=101$). This is due to the kink of the payoff $(S_T-K)^+$ at the
+strike: for even $N$ the middle terminal node sits exactly at $K$ (as in Figure~\ref{fig:tree}),
+where the payoff is zero, whereas for odd $N$ the two closest nodes straddle $K$. As $N$ grows,
+$\tilde p$ also approaches $\tfrac12$ ($0.4959$ for $N=4$, $0.4992$ for $N=100$), and the
+tree increasingly resembles the symmetric random walk of Part~I, whose limit is the
+continuous-time model behind Black--Scholes.
 
 \subsection{Sample paths and Monte Carlo}
 
@@ -246,7 +340,7 @@ can take any positive value. Both fan out over time (roughly \$150--\$350 by $t=
 Then report the Monte Carlo price with its SE and 95\% CI (from the final Restart \& Run All),
 and whether the Black--Scholes price lies inside the interval.}
 
-\subsection{Comparison}
+\subsection{Comparison}\label{sec:comparison}
 \begin{table}[H]
 \centering
 \begin{tabular}{lcc}
@@ -265,7 +359,10 @@ Black--Scholes & 31.4097 & -- \\
 deterministic and shrinks like $1/N$, while the Monte Carlo error is random and shrinks like
 $1/\sqrt M$ (it comes with a confidence interval); (iii) trade-offs: for a European call the tree
 reaches Black--Scholes accuracy much faster, while Monte Carlo is more flexible (path-dependent
-payoffs, several assets).}
+payoffs, several assets); (iv) robustness check of the Monte Carlo
+interval: repeating the simulation with 20 different seeds, the 95\% confidence interval contained
+the Black--Scholes price in X of 20 runs (re-run after the $\sigma$ update; was 19/20), consistent
+with the nominal 95\% coverage, so differences from Black--Scholes are sampling error rather than bias.}
 
 % =====================================================================
 \section{Conclusions}
@@ -274,7 +371,7 @@ payoffs, several assets).}
 
 \clearpage
 \appendix
-\section{Python code}
+\section{Python code}\label{app:code}
 \TODO{Key functions from the notebooks. Plan: export them to \texttt{project1/code/*.py} and include with
 \texttt{\textbackslash lstinputlisting\{../code/part1.py\}}. Check whether the appendix counts toward the 15-page limit.}
 
