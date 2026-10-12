@@ -1,0 +1,14 @@
+S0 = 228.38,  sigma_hat = 0.3760,  SE approx 0.0168
+Lecture check: 2.0480000000000005
+E[S_T]: tree 237.70519027964494  Euler 237.40256132098006  theory 237.70036461005762
+N =    10   price = 37.2250   error vs BS = -0.8273
+N =    50   price = 37.8850   error vs BS = -0.1674
+N =   100   price = 37.9685   error vs BS = -0.0838
+N =   101   price = 38.1318   error vs BS = +0.0794
+N =   500   price = 38.0356   error vs BS = -0.0168
+N =  1000   price = 38.0440   error vs BS = -0.0084
+Black-Scholes         : 38.0523
+CRR binomial (N=100) : 37.9685   diff vs BS = -0.0838
+Monte Carlo (M=100,000): 38.7570 +- 0.2102   95% CI [38.3450, 39.1691]   diff vs BS = +0.7047 (3.4 SE)
+96/100 confidence intervals contain the Black-Scholes price
+BS price at sigma -+ 0.017: 36.56837224774502 39.53469794116636

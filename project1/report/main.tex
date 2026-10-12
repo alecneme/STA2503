@@ -32,7 +32,9 @@
 \newcommand{\N}{\mathcal{N}}
 
 \lstset{language=Python, basicstyle=\ttfamily\footnotesize, breaklines=true,
-        frame=single, numbers=left, numberstyle=\tiny, showstringspaces=false}
+        frame=single, numbers=left, numberstyle=\tiny, showstringspaces=false, columns=fullflexible, keepspaces=true,
+        rangebeginprefix={\#\ BEGIN\ }, rangeendprefix={\#\ END\ }, includerangemarker=false}
+\lstdefinestyle{output}{language={}, numbers=none, frame=lines, title={Output}}
 
 \title[Discrete- vs.\ Continuous-Time Models]{STA2503 Project 1: Discrete-Time vs.\ Continuous-Time Financial Models}
 \author{Alec Neme}
@@ -40,11 +42,18 @@
 \begin{document}
 
 \begin{abstract}
-\TODO{Write this LAST, in two short paragraphs. (1) What you did: simulated scaled random walks
-and Brownian motion; priced a 1-year at-the-money European call on NVIDIA with a CRR binomial tree
-and with Monte Carlo under GBM; compared both with Black--Scholes. (2) Main findings, with the
-actual numbers: e.g.\ ``the binomial price converges to the Black--Scholes value of \$X as $N$
-grows; the Monte Carlo estimate is \$Y $\pm$ Z''.} lalala just testing
+We compare discrete-time and continuous-time models for stock prices and option pricing. In
+Part~I, we simulate Brownian motion and scaled symmetric random walks and show that the walks
+become indistinguishable from Brownian motion as the number of steps grows. In Part~II, we price a
+one-year at-the-money European call on NVIDIA (NVDA), with volatility estimated from one year of
+daily returns ($\hat\sigma = 37.6\%$), using a CRR binomial tree and Monte Carlo simulation of
+geometric Brownian motion, and compare both with the Black--Scholes price.
+
+The binomial price converges to the Black--Scholes value of \$38.05, with an error that
+oscillates between even and odd $N$ and decreases like $1/N$ (\$37.97 for $N = 100$). The Monte
+Carlo estimate with $100{,}000$ paths is \$38.76 $\pm$ 0.21. Although this particular run
+lies 3.4 standard errors from Black--Scholes, the 95\% confidence interval contained the
+Black--Scholes price in 96 of 100 repeated runs, consistent with sampling variation.
 \end{abstract}
 
 \maketitle
@@ -52,18 +61,34 @@ grows; the Monte Carlo estimate is \$Y $\pm$ Z''.} lalala just testing
 % =====================================================================
 \section{Introduction}
 % =====================================================================
-\TODO{3--5 sentences. Why compare discrete- and continuous-time models? (The binomial model is
-intuitive and exact under no-arbitrage for finite $N$; Black--Scholes/GBM is the continuous-time
-limit.) State the plan of the report (Part I: random walk $\to$ Brownian motion; Part II: CRR
-vs.\ GBM for NVDA) and the headline result in one sentence.}
+In practice, stock prices are discrete: they move in ticks and change only when trades occur.
+Over the life of an option, however, a stock trades so often that its price behaves like the
+limit of a random walk with many small steps, which motivates modelling it in continuous time
+with Brownian motion \citep{shreve2004b}.
+
+This project compares discrete-time and continuous-time approaches to pricing a European call
+option. Both rest on the same principle: the price of an option is the cost of a portfolio that
+replicates its payoff, and this cost equals the discounted expected payoff under a risk-neutral
+measure, under which the discounted stock price is a martingale \citep{shreve2004a,shreve2004b}.
+The approaches differ in how they treat time. In the Cox--Ross--Rubinstein (CRR) binomial model, the stock
+moves up or down by a fixed factor at a finite number of dates, whereas under geometric Brownian
+motion (GBM) it moves continuously. We price the same option in three ways: with the CRR binomial
+tree; with the Black--Scholes formula, which gives the exact price under GBM;
+and by Monte Carlo simulation of GBM paths using the Euler--Maruyama scheme.
+
+Part~I simulates scaled symmetric random walks and compares them with Brownian motion,
+illustrating the limit that links the two settings. Part~II prices a one-year at-the-money call
+on NVIDIA (NVDA) with all three methods and compares the results. Section~2 describes the models
+and their implementation, Section~3 presents the results, and Section~4 concludes. 
+
 
 % =====================================================================
 \section{Methodology}
 % =====================================================================
 All computations are done in Python (3.14) with NumPy for arrays and random numbers, SciPy for
 the normal CDF, pandas and \texttt{yfinance} for the market data, and Matplotlib for the figures.
-The code is organised as small functions, one per step of the methodology below
-(Appendix~\ref{app:code}).
+All code is in a single script, organised as small functions, one per step of the methodology
+below; each subsection cites the corresponding listing in Appendix~\ref{app:code}.
 
 \subsection{Brownian motion and scaled random walks}
 Let $(\Omega,\mathcal F,\{\mathcal F_t\}_{t\ge 0},\PP)$ be a filtered probability space.
@@ -93,7 +118,7 @@ $\operatorname{Var}(W^{(N)}_1)=1$ as $N\to\infty$.
 at once as an array with one row per path and one column per time step, and builds the paths
 with a cumulative sum along each row, as in \eqref{eq:bm_scheme}. \texttt{scaled\_random\_walk}
 does the same with $\pm1$ steps drawn by \texttt{rng.choice} and then rescales by $1/\sqrt N$,
-as in \eqref{eq:srw}. A column of zeros is prepended so that every path starts at $0$.
+as in \eqref{eq:srw}. A column of zeros is prepended so that every path starts at $0$ (Listing~\ref{lst:rw}).
 
 \subsection{Market data and parameters}
 The inputs below are shared by the three pricing methods of Sections~\ref{sec:crr}--\ref{sec:bs}.
@@ -114,7 +139,8 @@ and 30 September 2026. The one-year window matches the maturity of the option, a
 prices remove artificial jumps due to stock splits and dividends. This gives
 $\hat\sigma=37.60\%$, with approximate standard error
 $\hat\sigma/\sqrt{2n}\approx1.7$ percentage points. In the code, \texttt{estimate\_volatility}
-computes the log returns with \texttt{np.diff(np.log(closes))} and applies \eqref{eq:sigma_hat}.
+computes the log returns with \texttt{np.diff(np.log(closes))} and applies \eqref{eq:sigma_hat}
+(Listing~\ref{lst:data}).
 
 \noindent\textbf{Interest rate.} We use $r=4\%$, a round value within the range of the 1-year
 US Treasury yield over the past year (approximately 3.4\%--4.6\%) and somewhat below its level
@@ -146,7 +172,7 @@ u=e^{\sigma\sqrt{\Delta t}},\qquad d=\frac1u,\qquad \tilde p=\frac{e^{r\Delta t}
 \end{equation}
 No arbitrage requires $d<e^{r\Delta t}<u$, which holds for our parameters.
 Note that $e^{r\Delta t}$ is the continuously-compounded version of the $1+r$
-rate used in lecture. Similarly, for the model we assume a finite and constant r.
+rate used in lecture. The function that calculates parameters has a test to ensure the no arbitrage condition is met. Similarly, for the model we assume a finite and constant r.
 After $n$ steps with $j$ up-moves the price is $S_n(j)=S_0\,u^{j}d^{\,n-j}$, $j=0,\dots,n$.
 Since $d=1/u$ the tree recombines, so only the number of up-moves matters, not their order
 (e.g.\ $S_2(HT)=S_2(TH)=S_2(1)$ in the path notation of the lectures).
@@ -171,7 +197,8 @@ of values $V_{n+1}$, the up-children of all nodes are \texttt{V[1:]} and the dow
 \texttt{V[:-1]}, so each step back is a single vectorised line. \texttt{binomial\_call} chains
 these functions. Sample paths through the tree (\texttt{simulate\_tree\_paths}) draw up-moves
 with probability $\tilde p$ by comparing uniform random numbers with $\tilde p$, map them to
-factors $u$ or $d$ with \texttt{np.where}, and take a cumulative product along each path.
+factors $u$ or $d$ with \texttt{np.where}, and take a cumulative product along each path
+(Listing~\ref{lst:crr}).
 
 \subsection{Geometric Brownian motion and Monte Carlo}\label{sec:gbm}
 Under GBM, $dS_t=\mu S_t\,dt+\sigma S_t\,dW_t$. Applying It\^o's formula to $\log S_t$,
@@ -205,7 +232,7 @@ with the same structure as the tree simulation: it draws all standard normals $\
 forms the one-step factors $1+r\Delta t+\sigma\sqrt{\Delta t}\,\xi$, and takes a cumulative
 product along each path. \texttt{mc\_call\_price} computes the estimator and standard error
 \eqref{eq:mc} from the terminal prices, using the sample standard deviation (with $M-1$ in the
-denominator).
+denominator) (Listing~\ref{lst:gbm}).
 
 \subsection{Black--Scholes benchmark}\label{sec:bs}
 \begin{equation}\label{eq:bs}
@@ -213,7 +240,7 @@ C_{BS}=S_0\,\Phi(d_+)-Ke^{-rT}\Phi(d_-),\qquad
 d_\pm=\frac{\ln(S_0/K)+(r\pm\tfrac12\sigma^2)T}{\sigma\sqrt T},
 \end{equation}
 where $\Phi$ is the standard normal CDF, evaluated with \texttt{scipy.stats.norm.cdf} in
-\texttt{black\_scholes\_call}.
+\texttt{black\_scholes\_call} (Listing~\ref{lst:bs}).
 
 \subsection{Verification and reproducibility}
 \noindent\textbf{Verification.} Each function was tested against a known answer before use:
@@ -222,13 +249,14 @@ no-arbitrage check correctly rejects inconsistent inputs; for both the tree and 
 scheme, the simulated mean of $S_T$ under $\Q$ matches $S_0e^{rT}$ within Monte Carlo error,
 as required by the martingale property of discounted prices; and the Monte Carlo confidence
 interval was checked for coverage over repeated runs (Section~\ref{sec:comparison}).
+These tests are in Listings~\ref{lst:tests} and~\ref{lst:results}.
 
 \noindent\textbf{Reproducibility.} All randomness comes from NumPy random generators with fixed
-seeds (\texttt{default\_rng(2503)} in each notebook, and separate fixed seeds for the tests), so
-re-running a notebook from top to bottom reproduces every figure and number in this report.
+seeds (\texttt{default\_rng(2503)} for each part, and separate fixed seeds for the tests), so
+re-running the script from top to bottom reproduces every figure and number in this report.
 Market data are downloaded once and stored as CSV files, so results do not change when new
 data become available. Every figure is produced by the code and saved directly into the report,
-and all reported numbers come from a single top-to-bottom run of each notebook. The code is
+and all reported numbers come from a single top-to-bottom run of the script. The code is
 version-controlled with Git.
 
 % =====================================================================
@@ -278,9 +306,6 @@ Each straight segment has slope $\pm\sqrt{N_2}$, which becomes steeper as $N_2$ 
 the discrete counterpart of the fact that Brownian motion paths are nowhere differentiable.
 
 \subsection{Binomial model}\label{sec:binomial}
-\TODO{Update ALL numbers in Sections 3.2--3.4 after Restart \& Run All with $\hat\sigma=37.60\%$
-(e.g.\ BS $\approx 38.05$; CRR $N=100\approx37.97$; $N=4$: $u=1.2068$, $d=0.8286$, $\tilde p=0.4797$;
-first-step prices, error values, $N\times$error, odd-$N$ example, $\tilde p$ at $N=100\approx0.4959$).}
 
 \begin{figure}[H]
 \centering
@@ -295,26 +320,24 @@ first-step prices, error values, $N\times$error, odd-$N$ example, $\tilde p$ at 
 \caption{CRR binomial model for the one-year at-the-money call on NVDA. \label{fig:binomial}}
 \end{figure}
 
-Figure~\ref{fig:tree} shows the CRR tree for NVDA with $N=4$, for which $u=1.1618$,
-$d=0.8607$ and $\tilde p=0.4959$. Because $d=1/u$, an up-move followed by a down-move returns
+Figure~\ref{fig:tree} shows the CRR tree for NVDA with $N=4$, for which $u=1.2068$,
+$d=0.8286$ and $\tilde p=0.4797$. Because $d=1/u$, an up-move followed by a down-move returns
 the stock to its starting value, so the tree recombines: \$228.38 reappears at $t=0.5$ and
 $t=1$, and after $n$ steps there are only $n+1$ distinct prices rather than $2^n$. The moves
 are proportional rather than additive, so in dollar terms an up-move is larger than a down-move
-(\$228.38 rises to \$265.34 or falls to \$196.57 in the first step). Finally, since $N$ is even,
+(\$228.38 rises to \$275.62 or falls to \$189.24 in the first step). Finally, since $N$ is even,
 one terminal node lies exactly at the strike $K=S_0=\$228.38$.
 
-
-
-With $N=100$ steps, the CRR price of the one-year at-the-money call is \$31.3425.
+With $N=100$ steps, the CRR price of the one-year at-the-money call is \$37.9685.
 Figure~\ref{fig:convergence} shows that as $N$ increases the binomial price converges to the
-Black--Scholes price of \$31.4097: the error is $-\$0.66$ for $N=10$, $-\$0.07$ for $N=100$
-and $-\$0.007$ for $N=1000$. The product $N\times(\text{error})$ stays close to $-6.7$ for all
+Black--Scholes price of \$38.0523: the error is $-\$0.83$ for $N=10$, $-\$0.08$ for $N=100$
+and $-\$0.008$ for $N=1000$. The product $N\times(\text{error})$ stays close to $-8.4$ for all
 $N$ we tried, so the error decreases roughly like $1/N$. The convergence is not monotone: the
 price oscillates between even $N$, which lie below Black--Scholes, and odd $N$, which lie above
-it (e.g.\ \$31.4731 for $N=101$). This is due to the kink of the payoff $(S_T-K)^+$ at the
+it (e.g.\ \$38.1318 for $N=101$). This is due to the kink of the payoff $(S_T-K)^+$ at the
 strike: for even $N$ the middle terminal node sits exactly at $K$ (as in Figure~\ref{fig:tree}),
 where the payoff is zero, whereas for odd $N$ the two closest nodes straddle $K$. As $N$ grows,
-$\tilde p$ also approaches $\tfrac12$ ($0.4959$ for $N=4$, $0.4992$ for $N=100$), and the
+$\tilde p$ also approaches $\tfrac12$ ($0.4797$ for $N=4$, $0.4959$ for $N=100$), and the
 tree increasingly resembles the symmetric random walk of Part~I, whose limit is the
 continuous-time model behind Black--Scholes.
 
@@ -333,12 +356,18 @@ continuous-time model behind Black--Scholes.
 \caption{Ten simulated NVDA price paths over one year under each model (risk-neutral measure). \label{fig:paths}}
 \end{figure}
 
-\TODO{Discussion: compare the two panels of Figure~\ref{fig:paths}. With $N=100$ the tree paths
-already look much like GBM paths (each tree step is $\pm\sigma\sqrt{\Delta t}\approx\pm3\%$, the
-same scale as the GBM shock), but tree prices can only land on the $N+1$ nodes, while GBM prices
-can take any positive value. Both fan out over time (roughly \$150--\$350 by $t=1$).
-Then report the Monte Carlo price with its SE and 95\% CI (from the final Restart \& Run All),
-and whether the Black--Scholes price lies inside the interval.}
+Figure~\ref{fig:paths} shows ten sample paths of the NVDA stock price over one year under each
+model (ten are shown for readability; the Monte Carlo price in Section~\ref{sec:comparison} uses
+$M = 100{,}000$ paths). Both models are simulated on the same grid of $N = 100$ steps, but their
+step sizes differ. In the CRR binomial model every step multiplies the price by the fixed factor
+$u$ or $d$, so the price moves on a lattice and can only take values at the nodes of the tree,
+with $N+1$ possible values at maturity. In the GBM Euler--Maruyama scheme, each step instead
+multiplies the price by a continuous random factor $1 + r\Delta t + \sigma\sqrt{\Delta t}\,\xi$,
+whose random part has the same typical size, $\sigma\sqrt{\Delta t} \approx 3.8\%$, so the price
+can take any positive value. Both sets of paths fan out over time to roughly \$150--\$300 by
+$t = 1$; with only ten paths per panel, differences in the visible spread are mostly due to
+sampling variation. If $N$ was increased, the binomial paths become indistinguishable from GBM paths,
+as we saw on the convergence of the scaled random walk to Brownian motion in Part~I.
 
 \subsection{Comparison}\label{sec:comparison}
 \begin{table}[H]
@@ -347,32 +376,85 @@ and whether the Black--Scholes price lies inside the interval.}
 \toprule
 Method & Call price (\$) & Difference from BS (\$) \\
 \midrule
-CRR binomial, $N=100$ & 31.3425 & $-0.0672$ \\
-Monte Carlo (GBM), $M=100{,}000$ & \TODO{x.xxxx} $\pm$ \TODO{0.16} & \TODO{} \\
-Black--Scholes & 31.4097 & -- \\
+CRR binomial, $N=100$ & 37.9685 & $-0.0838$ \\
+Monte Carlo (GBM), $M=100{,}000$ & $38.7570 \pm 0.2102$ & $+0.7047$ \\
+Black--Scholes & 38.0523 & -- \\
 \bottomrule
 \end{tabular}
-\caption{One-year at-the-money European call on NVDA. \label{tbl:comparison}}
+\caption{One-year at-the-money European call on NVDA ($S_0=K=\$228.38$, $\sigma=37.60\%$, $r=4\%$). \label{tbl:comparison}}
 \end{table}
-% Monte Carlo row: copy the numbers from the comparison cell after the final Restart & Run All.
-\TODO{Discussion: (i) all three prices agree to within a few cents; (ii) the binomial error is
-deterministic and shrinks like $1/N$, while the Monte Carlo error is random and shrinks like
-$1/\sqrt M$ (it comes with a confidence interval); (iii) trade-offs: for a European call the tree
-reaches Black--Scholes accuracy much faster, while Monte Carlo is more flexible (path-dependent
-payoffs, several assets); (iv) robustness check of the Monte Carlo
-interval: repeating the simulation with 20 different seeds, the 95\% confidence interval contained
-the Black--Scholes price in X of 20 runs (re-run after the $\sigma$ update; was 19/20), consistent
-with the nominal 95\% coverage, so differences from Black--Scholes are sampling error rather than bias.}
+
+Table~\ref{tbl:comparison} compares the three prices. The binomial price with $N=100$ is
+\$37.9685, \$0.08 below the Black--Scholes price of \$38.0523. The Monte Carlo estimate is
+\$38.7570 with standard error \$0.2102, giving the 95\% confidence interval [\$38.35, \$39.17],
+which in this run does not contain the Black--Scholes price: the difference is about 3.4 standard
+errors. To check whether this reflects a bias or sampling error, we repeated the simulation with
+100 different seeds: the 95\% confidence interval contained the Black--Scholes price in 96 of
+the 100 runs, consistent with its nominal coverage. The discrepancy in the main run is therefore
+attributable to Monte Carlo sampling variation rather than to an error in the method.
+
+The two numerical methods differ in the nature of their error: the binomial error is
+deterministic and decreases like $1/N$, while the Monte Carlo error is random and decreases only
+like $1/\sqrt{M}$, so halving it requires four times as many paths. For a European call, the CRR
+model therefore reaches Black--Scholes accuracy more cheaply; the advantage of Monte Carlo is
+its flexibility, since it extends directly to path-dependent payoffs and several underlying
+assets, where trees become computationally more expensive as the number of nodes grows very
+quickly.
 
 % =====================================================================
 \section{Conclusions}
 % =====================================================================
-\TODO{3--5 sentences: main findings with numbers, one limitation (e.g.\ constant $\sigma$ and $r$), one possible extension.}
+
+Both approaches lead to the same option price. Part~I showed that scaled random walks converge
+to Brownian motion, and Part~II showed the analogous result for prices: the CRR binomial price
+converges to the Black--Scholes value of \$38.05 with an error of order $1/N$ (\$0.08 for
+$N = 100$), and Monte Carlo simulation of GBM agrees with Black--Scholes up to sampling error,
+which decreases more slowly, like $1/\sqrt{M}$. For a European call, the binomial tree is the
+more efficient numerical method, while Monte Carlo is more flexible.
+
+Moreover, the assumption of constant volatility does not hold in practice. Returns exhibit
+volatility clustering, with calm periods and turbulent periods that each tend to persist, so the
+estimate $\hat\sigma$ depends on the window used to compute it. Prices can also move sharply in
+response to news, producing large moves that are more frequent than what a normal distribution
+predicts and that none of the models really capture. A natural extension would be a model in which
+volatility itself varies over time, such as a stochastic volatility model. 
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
 
 \clearpage
 \appendix
 \section{Python code}\label{app:code}
-\TODO{Key functions from the notebooks. Plan: export them to \texttt{project1/code/*.py} and include with
-\texttt{\textbackslash lstinputlisting\{../code/part1.py\}}. Check whether the appendix counts toward the 15-page limit.}
+All results in this report are produced by a single script, \texttt{code/project1.py}, which can
+be run from top to bottom (or cell by cell in VS Code) and regenerates every figure and number.
+The listings below show the core code; line numbers refer to the script. Each listing that prints
+results is followed by its output from a full run of the script (saved in
+\texttt{code/project1\_output.txt}); the graphical output is Figures~\ref{fig:bm_rw10}--\ref{fig:paths}
+in Section~3. The plotting code is in the same script and is omitted here for space.
+
+\lstinputlisting[linerange={rw-rw}, label={lst:rw},
+  caption={Part I: simulating Brownian motion and scaled random walks.}]{../code/project1.py}
+
+\lstinputlisting[linerange={data-data}, label={lst:data},
+  caption={Market data, volatility estimate and model inputs.}]{../code/project1.py}
+\lstinputlisting[style=output, firstline=1, lastline=1]{../code/project1_output.txt}
+
+\lstinputlisting[linerange={crr-crr}, label={lst:crr},
+  caption={CRR binomial model: parameters, backward induction and sample paths.}]{../code/project1.py}
+
+\lstinputlisting[linerange={bs-bs}, label={lst:bs},
+  caption={Black--Scholes price.}]{../code/project1.py}
+
+\lstinputlisting[linerange={gbm-gbm}, label={lst:gbm},
+  caption={GBM with the Euler--Maruyama scheme and the Monte Carlo price.}]{../code/project1.py}
+
+\lstinputlisting[linerange={tests-tests}, label={lst:tests},
+  caption={Verification against known answers.}]{../code/project1.py}
+\lstinputlisting[style=output, firstline=2, lastline=3]{../code/project1_output.txt}
+
+\lstinputlisting[linerange={conv-conv,paths-paths,compare-compare}, label={lst:results},
+  caption={Numerical results: binomial convergence, sample paths, comparison of the three
+  prices, confidence-interval coverage and sensitivity to $\sigma$.}]{../code/project1.py}
+\lstinputlisting[style=output, firstline=4, lastline=14]{../code/project1_output.txt}
 
 \end{document}
