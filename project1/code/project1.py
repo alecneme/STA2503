@@ -31,7 +31,6 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # BEGIN rw
 def simulate_bm(N, n_paths, rng):
-    """Brownian motion on [0, 1] with N steps; each row of W is one path."""
     dt = 1 / N
     t = np.linspace(0, 1, N + 1)
     dW = rng.normal(0, np.sqrt(dt), size=(n_paths, N))   # W_{t+dt} - W_t ~ N(0, dt)
@@ -41,7 +40,6 @@ def simulate_bm(N, n_paths, rng):
 
 
 def scaled_random_walk(N, n_paths, rng):
-    """Scaled symmetric random walk W^(N) on [0, 1]; each row of W is one path."""
     t = np.linspace(0, 1, N + 1)
     Z = rng.choice([-1, 1], size=(n_paths, N))            # fair +-1 coin flips
     X = np.cumsum(Z, axis=1)                              # X_n = Z_1 + ... + Z_n
@@ -113,7 +111,6 @@ closes = pd.read_csv(HIST_FILE, index_col=0)["Close"].to_numpy()  # 252 adjusted
 
 
 def estimate_volatility(closes, periods_per_year=252):
-    """Annualised historical volatility from daily closing prices."""
     log_returns = np.diff(np.log(closes))
     return np.sqrt(periods_per_year) * log_returns.std(ddof=1)
 
@@ -132,7 +129,6 @@ print(f"S0 = {S0},  sigma_hat = {sigma:.4f},  SE approx {sigma / np.sqrt(2 * (le
 
 # BEGIN crr
 def crr_parameters(sigma, r, T, N):
-    """CRR parameters dt, u, d and risk-neutral probability p."""
     dt = T / N
     u = np.exp(sigma * np.sqrt(dt))
     d = 1 / u
@@ -144,7 +140,6 @@ def crr_parameters(sigma, r, T, N):
 
 
 def prices_at_step(S0, u, d, n):
-    """All n+1 stock prices S_n(j) = S0 u^j d^(n-j), j = 0..n."""
     j = np.arange(n + 1)
     return S0 * u**j * d**(n - j)
 
@@ -154,7 +149,6 @@ def call_payoff(S, K):
 
 
 def backward_induction(V_T, p, disc_fctr):
-    """Roll terminal values back to time 0; V[1:] = up-children, V[:-1] = down-children."""
     V = V_T.copy()
     q = 1 - p
     for i in range(len(V_T) - 1):
@@ -169,7 +163,6 @@ def binomial_call(S0, K, T, r, sigma, N):
 
 
 def simulate_tree_paths(S0, sigma, r, T, N, n_paths, rng):
-    """Sample paths through the CRR tree: up with probability p, down otherwise."""
     dt, u, d, p = crr_parameters(sigma, r, T, N)
     t = np.linspace(0, T, N + 1)
     up = rng.random(size=(n_paths, N)) < p
@@ -198,7 +191,6 @@ def black_scholes_call(S0, K, T, r, sigma):
 
 # BEGIN gbm
 def simulate_gbm_euler(S0, mu, sigma, T, N, n_paths, rng):
-    """Euler-Maruyama: S_{k+1} = S_k (1 + mu dt + sigma sqrt(dt) xi_{k+1})."""
     dt = T / N
     t = np.linspace(0, T, N + 1)
     Z = rng.standard_normal(size=(n_paths, N))
@@ -209,7 +201,6 @@ def simulate_gbm_euler(S0, mu, sigma, T, N, n_paths, rng):
 
 
 def mc_call_price(S0, K, T, r, sigma, N, M, rng):
-    """Monte Carlo price under Q (mu = r) and its standard error."""
     t, S = simulate_gbm_euler(S0, r, sigma, T, N, M, rng)
     disc_payoffs = np.exp(-r * T) * call_payoff(S[:, -1], K)
     price = disc_payoffs.mean()
